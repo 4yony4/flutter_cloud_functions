@@ -10,6 +10,8 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const {onDocumentCreated,onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const functions = require("firebase-functions");
+const { getAuth, createUserWithEmailAndPassword } = require("firebase-admin/auth");
 
 // The Firebase Admin SDK to access Firestore.
 const {initializeApp} = require("firebase-admin/app");
@@ -67,7 +69,35 @@ exports.actualizado = onDocumentUpdated("/messages/{documentId}",async (event) =
     return;
 });
 
-exports.sendWelcomeEmail = functions.auth.user().onCreate((user) => {
+exports.createFireStoreProfil = functions.auth.user().onCreate(async (user) => {
   // ...
-  const writeResult = await getFirestore().collection("profiles").add({original: original,autor:autor});
+  const uid = user.uid;
+  const email = user.email; // The email of the user.
+  const displayName = user.displayName; // The display name of the user.
+  //const writeResult = await getFirestore().collection("profiles").add({original: original,autor:autor});
+  const writeResult = await getFirestore().collection("profiles").doc(uid).set({name:displayName,uid:uid,email:email});
+  return;
 });
+
+exports.profileCreated = onDocumentCreated("/profiles/{profileId}", (event) => {
+  const perfil = event.data.data();
+
+  // Access the parameter `{documentId}` with `event.params`
+  logger.log("Creando Perfil en Auth", event.params.documentId, original);
+
+    const auth = getAuth();
+    createUserWithEmailAndPassword(auth, perfil.email, perfil.password)
+      .then((userCredential) => {
+        // Signed in
+        const user = userCredential.user;
+        return event.data.ref.set({authUID:user.uid}, {merge: true});
+        // ...
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        // ..
+      });
+    return;
+});
+
